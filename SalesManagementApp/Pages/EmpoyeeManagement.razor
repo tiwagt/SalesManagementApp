@@ -1,0 +1,241 @@
+﻿@page "/employeemanagement"
+@using SalesManagementApp.Entities
+@using SalesManagementApp.Models
+@using SalesManagementApp.Services.Contracts
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Spinner
+@using Syncfusion.Blazor.Navigations
+
+@inject IEmployeeManagementService EmployeeManagementService 
+
+<h3 class="mb-4">Employee Administration</h3>
+
+<div style="max-width:1100px">
+    <SfGrid @ref="SfEmployeeGrid"  DataSource="employeeData" AllowSorting="true" AllowExcelExport="true" AllowPdfExport="true" AllowPaging="true" Toolbar="@toolbar" >
+        <GridEditSettings Mode = "EditMode.Dialog" AllowAdding = "true"  AllowEditing ="true" AllowDeleting = "true">
+            <HeaderTemplate>
+                <span>@(GetDialogHeaderText(context as EmployeeModel))</span>
+            </HeaderTemplate>
+            <FooterTemplate>
+                <SfButton OnClick="@Save" IsPrimary = "true">@DialogButtonCaption</SfButton>
+                <SfButton OnClick="@Cancel">Cancel</SfButton>
+            </FooterTemplate>
+        </GridEditSettings>
+            
+        <GridEvents  OnActionBegin="ActionBeginHandler" OnToolbarClick="ToolbarBtnClickHandler" OnActionComplete="ActionCompleteHandler" TValue="EmployeeModel"></GridEvents>
+        <GridColumns>
+            <GridColumn AllowAdding="false" IsPrimaryKey="true" Field="@nameof(EmployeeModel.Id)" TextAlign="TextAlign.Center"></GridColumn>
+            
+            <GridColumn AllowAdding ="false" AllowEditing ="false" HeaderText="Profile" Width="120px">
+                <Template>
+                    @{
+                        var employee = (context as EmployeeModel);
+                                                    <div class="profile-image-container">
+                                                        <img src="@(employee?.ImagePath)" />
+                                                    </div>
+                    }
+                </Template>
+            </GridColumn>
+
+            <GridColumn HeaderText="First Name" Field="@nameof(EmployeeModel.FirstName)"TextAlign="TextAlign.Center" Width="120px"> </GridColumn>
+            <GridColumn HeaderText="Last Name" Field="@nameof(EmployeeModel.LastName)" TextAlign="TextAlign.Center" Width="120px"> </GridColumn>
+            
+             <GridForeignColumn HeaderText="Designation" TValue="EmployeeJobTitle" TextAlign="TextAlign.Center"
+                                        Field="@nameof(EmployeeModel.EmployeeJobTitleId)"
+                                        ForeignDataSource="employeeJobTitleData"
+                                        ForeignKeyValue="Name" Width="100px">
+                <EditTemplate>
+                    <SfDropDownList @bind-value ="@((context as EmployeeModel).EmployeeJobTitleId)" 
+                                            ID="EmployeeJobTitleId"
+                                            DataSource="employeeJobTitleData" TItem="EmployeeJobTitle"
+                                            TValue="int">
+                        <DropDownListFieldSettings Text="Name" Value="EmployeeJobTitleId">
+                        </DropDownListFieldSettings>
+
+                    </SfDropDownList>
+                </EditTemplate>
+            </GridForeignColumn>
+
+            <GridColumn HeaderText="Gender" Field="@nameof(EmployeeModel.Gender)" TextAlign="TextAlign.Center">
+                <EditTemplate>
+                    <SfDropDownList DataSource="genderCollection" TItem ="string" TValue="string"
+                        @bind-value = "@((context as EmployeeModel).Gender)">
+
+                    </SfDropDownList>
+                </EditTemplate>
+            </GridColumn>
+            <GridColumn Field="@nameof(EmployeeModel.Email)" Width="120px"></GridColumn>
+
+            <GridColumn HeaderText="DOB" Field="@nameof(EmployeeModel.DateOfBirth)" Format="d"> </GridColumn>
+
+            <GridForeignColumn HeaderText="Report To" TValue="ReportToModel" 
+                                        Field="@nameof(EmployeeModel.ReportToEmpId)"
+                                        ForeignDataSource="reportToEmployeeData"
+                                        ForeignKeyValue="ReportToName" Width="100px">
+                <EditTemplate>
+                    <SfDropDownList @bind-value ="@((context as EmployeeModel).ReportToEmpId)" 
+                                            ID="ReportToEmpId"
+                                            DataSource="reportToEmployeeData" TItem="ReportToModel"
+                                            TValue="Nullable<int>">
+                        <DropDownListFieldSettings Text="ReportToName" Value="ReportToEmpId">
+                        </DropDownListFieldSettings>
+
+                    </SfDropDownList>
+                </EditTemplate>
+            </GridForeignColumn>
+
+            <GridColumn HeaderText="Operations" Width="110">
+                <GridCommandColumns>
+                    <GridCommandColumn Type = "CommandButtonType.Edit"
+                            ButtonOption="@(new CommandButtonOptions(){
+                                                IconCss = "e-icons e-edit",
+                                                CssClass ="e-flat"
+                                            })">
+
+                    </GridCommandColumn>
+                    <GridCommandColumn Type = "CommandButtonType.Delete"
+                            ButtonOption="@(new CommandButtonOptions(){
+                                                IconCss = "e-icons e-delete",
+                                                CssClass ="e-flat"
+                                            })">
+
+                    </GridCommandColumn>
+                    <GridCommandColumn Type = "CommandButtonType.Save"
+                            ButtonOption="@(new CommandButtonOptions(){
+                                                IconCss = "e-icons e-update",
+                                                CssClass ="e-flat"
+                                            })">
+
+                    </GridCommandColumn>
+                    <GridCommandColumn Type = "CommandButtonType.Cancel"
+                            ButtonOption="@(new CommandButtonOptions(){
+                                                IconCss = "e-icons e-cancel-icon",
+                                                CssClass ="e-flat"
+                                            })">
+
+                    </GridCommandColumn>
+                </GridCommandColumns>
+            </GridColumn>
+        </GridColumns>
+        <SfSpinner @bind-Visible="@VisibleProp"></SfSpinner>
+    </SfGrid>
+</div>
+<style>
+    .profile-image-container{
+        width: 80px;
+        height: 80px;
+    }
+    .profile-image-container img{
+        width: 100%;
+        height: 100%;
+        border-radius: 50px;
+    }
+</style>
+@code {
+    private enum GenderVal
+    {
+        Male,
+        Female,
+    }
+    private bool VisibleProp { get; set; } = false; 
+    private string DialogButtonCaption { get; set; }
+
+    private string[] genderCollection = Enum.GetNames(typeof(GenderVal));
+    private List<EmployeeModel>? employeeData = null;
+    private List<EmployeeJobTitle>? employeeJobTitleData;
+    private List<ReportToModel>? reportToEmployeeData;
+    private SfGrid<EmployeeModel>? SfEmployeeGrid { get; set; }
+    
+
+    private List<object> toolbar = new List<object> { "Add", "Search","ExcelExport","PdfExport", 
+                                        new ItemModel(){Text = "XML Export", TooltipText ="Export Data to XML", 
+                                        PrefixIcon = "e-click", Id = "XmlExport"} };
+    protected override async Task OnInitializedAsync(){
+        VisibleProp = true;
+
+        employeeData = await EmployeeManagementService.GetEmployees();
+
+        employeeJobTitleData = await EmployeeManagementService.GetJobTitles();
+
+        reportToEmployeeData = await EmployeeManagementService.GetReportToEmployees();
+
+        VisibleProp = false;
+
+    }
+
+    public async void ActionBeginHandler(ActionEventArgs<EmployeeModel> args)
+    {
+
+        if (args.RequestType.Equals(Syncfusion.Blazor.Grids.Action.Save))
+        {
+            if(args.Action == "Add")
+            {
+                await EmployeeManagementService.AddEmployee(args.Data);
+
+            }
+             else if(args.Action == "Edit")
+            {
+                await EmployeeManagementService.UpdateEmployee(args.Data);
+            }
+        }   
+        else if (args.RequestType.Equals(Syncfusion.Blazor.Grids.Action.Delete))
+        {
+            await EmployeeManagementService.DeleteEmployee(args.Data.Id);
+        }
+    }
+
+    public async void ActionCompleteHandler(ActionEventArgs<EmployeeModel> args)
+    {
+        if (args.RequestType.Equals(Syncfusion.Blazor.Grids.Action.Save))
+        {
+            if (args.Action == "Add")
+            {
+                employeeData = await EmployeeManagementService.GetEmployees();
+
+                 SfEmployeeGrid?.Refresh();
+            }
+        }
+    }
+
+    public async void ToolbarBtnClickHandler(Syncfusion.Blazor.Navigations.ClickEventArgs args)
+    {
+        if (args.Item.Id.Contains("_excelexport"))
+        {
+            await SfEmployeeGrid.ExportToExcelAsync();
+
+        }
+        else if(args.Item.Id.Contains("_pdfexport"))
+        {
+            await SfEmployeeGrid.ExportToPdfAsync();
+        }
+        else if(args.Item.Id == "XmlExport")
+        {
+            Console.Write("Export to Xml functionality");
+        }
+    }
+
+    private string GetDialogHeaderText(EmployeeModel employeeModel)
+    {
+        if(employeeModel.Id == 0)
+        {
+              DialogButtonCaption = "Add";
+              return "Add Employee";
+        }
+        else
+        {
+              DialogButtonCaption = "Update";
+              return $"Edit Details: {employeeModel.FirstName} {employeeModel.LastName}";
+        }
+    }
+
+    private async Task Cancel()
+    {
+        await SfEmployeeGrid.CloseEditAsync();
+    }
+    private async Task Save()
+    {
+        await SfEmployeeGrid.EndEditAsync();
+    }
+}
